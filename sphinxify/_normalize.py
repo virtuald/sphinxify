@@ -48,14 +48,25 @@ def normalize_inlines(nodes: Sequence[Inline]) -> List[Inline]:
         if style and isinstance(node, Text):
             if result and isinstance(result[-1], Style) and result[-1].kind == style:
                 previous = result[-1].children[-1]
-                if isinstance(previous, Text):
+                if isinstance(previous, Text) and previous.plain == node.plain:
                     previous.value += node.value
-                    return
-            result.append(Style(style, [Text(node.value)]))
-        elif isinstance(node, Text) and result and isinstance(result[-1], Text):
+                else:
+                    result[-1].children.append(Text(node.value, node.plain))
+                return
+            result.append(Style(style, [Text(node.value, node.plain)]))
+        elif (
+            isinstance(node, Text)
+            and result
+            and isinstance(result[-1], Text)
+            and result[-1].plain == node.plain
+        ):
             result[-1].value += node.value
+        elif isinstance(node, Literal):
+            result.append(Literal(" ".join(node.value.split()), source=node.source))
         else:
-            result.append(Text(node.value) if isinstance(node, Text) else node)
+            result.append(
+                Text(node.value, node.plain) if isinstance(node, Text) else node
+            )
 
     def visit(children: Sequence[Inline], style: Optional[str] = None):
         for child in children:
@@ -79,20 +90,33 @@ def normalize_inlines(nodes: Sequence[Inline]) -> List[Inline]:
     spaced: List[Inline] = []
     for node in result:
         if isinstance(node, Style):
-            value = "".join(
-                child.value for child in node.children if isinstance(child, Text)
-            )
-            body = value.strip()
-            if not body:
-                spaced.append(Text(value))
-                continue
-            leading = value[: len(value) - len(value.lstrip())]
-            trailing = value[len(value.rstrip()) :]
-            if leading:
-                spaced.append(Text(leading))
-            spaced.append(Style(node.kind, [Text(body)]))
-            if trailing:
-                spaced.append(Text(trailing))
+            body = [
+                Text(child.value, child.plain)
+                for child in node.children
+                if isinstance(child, Text)
+            ]
+            while body:
+                value = body[0].value
+                leading = value[: len(value) - len(value.lstrip())]
+                if leading:
+                    spaced.append(Text(leading, body[0].plain))
+                body[0].value = value.lstrip()
+                if body[0].value:
+                    break
+                body.pop(0)
+            trailing: List[Inline] = []
+            while body:
+                value = body[-1].value
+                suffix = value[len(value.rstrip()) :]
+                if suffix:
+                    trailing.insert(0, Text(suffix, body[-1].plain))
+                body[-1].value = value.rstrip()
+                if body[-1].value:
+                    break
+                body.pop()
+            if body:
+                spaced.append(Style(node.kind, list(body)))
+            spaced.extend(trailing)
         else:
             spaced.append(node)
     return spaced
@@ -108,10 +132,7 @@ def _raw_parts(node: ParsedNode):
         parts.append(node.closing)
         return parts
     if isinstance(node, HtmlNote):
-        parts = []
-        for child in node.children:
-            parts.extend(_raw_parts(child))
-        return parts
+        return [Note(_lower(node.children))]
     return [node]
 
 
@@ -126,8 +147,8 @@ def _raw_text(node: ParsedNode) -> str:
             result.append(part.source)
         elif isinstance(part, Role):
             result.append(part.target)
-        elif isinstance(part, CodeBlockNode):
-            result.append(part.text)
+        elif isinstance(part, (CodeBlockNode, Note)):
+            raise TypeError("Structural block cannot be flattened into inline source")
     return "".join(result)
 
 
@@ -147,24 +168,36 @@ def _plain(node: ParsedNode) -> str:
 
 def _inline(node: ParsedNode, in_cell: bool = False) -> List[Inline]:
     if isinstance(node, HtmlText):
-        text = _unescape(node.source)
-        return [Text(re.sub(r"\s+", " ", text) if in_cell else text)]
+        result: List[Inline] = []
+        position = 0
+        for match in re.finditer(
+            r"&(?:#[xX][0-9a-fA-F]+|#[0-9]+|[A-Za-z][A-Za-z0-9]*);", node.source
+        ):
+            before = node.source[position : match.start()]
+            decoded = _unescape(match[0])
+            result.append(Text(re.sub(r"\s+", " ", before) if in_cell else before))
+            result.append(
+                Text(
+                    re.sub(r"\s+", " ", decoded) if in_cell else decoded,
+                    plain=decoded != match[0],
+                )
+            )
+            position = match.end()
+        tail = node.source[position:]
+        result.append(Text(re.sub(r"\s+", " ", tail) if in_cell else tail))
+        return result
     if isinstance(node, (Literal, Role, OpaqueInline)):
         return [node]
     if not isinstance(node, HtmlElement):
-        return [OpaqueInline(_raw_text(node))]
+        raise TypeError(
+            "Block content must be lowered structurally, not as inline text"
+        )
     if node.tag == "br":
         return [HardBreak()]
     if not node.closing:
         return [OpaqueInline(_raw_text(node))]
     if node.tag in {"code", "tt"}:
-        return [
-            Literal(
-                " ".join(
-                    _unescape("".join(_raw_text(c) for c in node.children)).split()
-                )
-            )
-        ]
+        return [Literal(_unescape("".join(_raw_text(c) for c in node.children)))]
     if node.tag == "a" and node.attrs.get("href"):
         return [Link(" ".join(_plain(node).split()), node.attrs["href"])]
     children = [inline for child in node.children for inline in _inline(child, in_cell)]
@@ -196,6 +229,60 @@ def _trim_inlines(inlines: List[Inline]) -> List[Inline]:
     return inlines
 
 
+def _has_semantic_block(node: ParsedNode) -> bool:
+    if isinstance(node, (CodeBlockNode, HtmlNote)):
+        return True
+    return isinstance(node, HtmlElement) and any(
+        _has_semantic_block(child) for child in node.children
+    )
+
+
+def _has_block_flow(node: ParsedNode) -> bool:
+    if isinstance(node, (CodeBlockNode, HtmlNote)):
+        return True
+    if isinstance(node, HtmlElement):
+        if node.tag in {"code", "tt"}:
+            return any(_has_semantic_block(child) for child in node.children)
+        if node.tag in {
+            "p",
+            "ul",
+            "ol",
+            "dl",
+            "li",
+            "table",
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "h5",
+            "h6",
+        }:
+            return True
+        return any(_has_block_flow(child) for child in node.children)
+    return False
+
+
+def _flow_nodes(children: Sequence[ParsedNode]):
+    for child in children:
+        if (
+            isinstance(child, HtmlElement)
+            and child.tag in set(_INLINE) | {"a", "sub", "sup", "code", "tt"}
+            and (
+                any(_has_semantic_block(c) for c in child.children)
+                if child.tag in {"code", "tt"}
+                else any(_has_block_flow(c) for c in child.children)
+            )
+        ):
+            # An inline wrapper cannot own a block in reST. Preserve its source
+            # markup, but keep block/note descendants in the structural flow.
+            yield OpaqueInline(child.opening)
+            yield from _flow_nodes(child.children)
+            if child.closing:
+                yield OpaqueInline(child.closing)
+        else:
+            yield child
+
+
 def _lower(children: Sequence[ParsedNode], in_cell: bool = False) -> List[Block]:
     result: List[Block] = []
     pending: List[Inline] = []
@@ -213,7 +300,7 @@ def _lower(children: Sequence[ParsedNode], in_cell: bool = False) -> List[Block]
             )
         pending.clear()
 
-    for child in children:
+    for child in _flow_nodes(children):
         if isinstance(child, HtmlText):
             # Blank source lines separate prose, never literal payloads.
             chunks = re.split(r"\n[ \t]*\n", child.source)
@@ -261,6 +348,8 @@ def _lower(children: Sequence[ParsedNode], in_cell: bool = False) -> List[Block]
                 )
             elif child.tag == "table":
                 result.append(_table(child))
+            elif any(_has_block_flow(descendant) for descendant in child.children):
+                result.append(PreservedBlock(_raw_parts(child)))
             else:
                 result.append(
                     Rubric(
@@ -304,6 +393,13 @@ def _list(element: HtmlElement, in_cell: bool) -> List[Block]:
 
 
 def _definitions(element: HtmlElement, in_cell: bool) -> List[Block]:
+    if any(
+        isinstance(child, HtmlElement)
+        and child.tag == "dt"
+        and any(_has_block_flow(c) for c in child.children)
+        for child in element.children
+    ):
+        return [PreservedBlock(_raw_parts(element))]
     result: List[Block] = []
     entries: List[DefinitionEntry] = []
     loose: List[ParsedNode] = []
@@ -351,9 +447,10 @@ def _definitions(element: HtmlElement, in_cell: bool) -> List[Block]:
 def _table(element: HtmlElement) -> Block:
     rows: List[List[HtmlElement]] = []
     caption: List[Inline] = []
+    caption_seen = False
 
     def collect(parent: HtmlElement) -> bool:
-        nonlocal caption
+        nonlocal caption, caption_seen
         allowed = (
             {"tr", "thead", "tbody", "tfoot", "caption"}
             if parent.tag == "table"
@@ -377,6 +474,9 @@ def _table(element: HtmlElement) -> Block:
                     row.append(cell)
                 rows.append(row)
             elif child.tag == "caption":
+                if caption_seen or any(_has_block_flow(c) for c in child.children):
+                    return False
+                caption_seen = True
                 caption = normalize_inlines(
                     [i for c in child.children for i in _inline(c, True)]
                 )

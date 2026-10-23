@@ -37,7 +37,9 @@ def _label(value: str) -> str:
     return value.replace("\\", "\\\\").replace("`", r"\`")
 
 
-def _prose(value: str) -> str:
+def _prose(value: str, plain: bool = False) -> str:
+    if plain:
+        return "".join("\\" + char if char in "\\`*_|[]" else char for char in value)
     return re.sub(r"\B_\b", r"\\_", value)
 
 
@@ -46,7 +48,7 @@ def render_inlines(nodes: Sequence[Inline]) -> str:
     after_break = False
     for node in nodes:
         if isinstance(node, Text):
-            text = _prose(node.value)
+            text = _prose(node.value, node.plain)
             if after_break:
                 text = text.lstrip(" \t")
             token = _Token(text)
@@ -71,13 +73,24 @@ def render_inlines(nodes: Sequence[Inline]) -> str:
                 text = f":{node.kind}:`{_label(value)}`"
             else:
                 marker = "**" if node.kind == "strong" else "*"
-                text = marker + _prose(value) + marker
+                text = (
+                    marker
+                    + "".join(
+                        _prose(child.value, child.plain)
+                        for child in node.children
+                        if isinstance(child, Text)
+                    )
+                    + marker
+                )
             token = _Token(text, True)
         elif isinstance(node, OpaqueInline):
             token = _Token(node.source)
         else:
             token = _Token("\n")
-        after_break = isinstance(node, (HardBreak, SoftBreak))
+        if isinstance(node, (HardBreak, SoftBreak)):
+            after_break = True
+        elif token.text.strip():
+            after_break = False
         if token.text:
             tokens.append(token)
 
@@ -227,24 +240,24 @@ def _block(block: Block) -> List[_Line]:
     if isinstance(block, PreservedBlock):
         # Raw source and semantic atoms remain distinct until this final write.
         raw_result = ""
-        after_code = False
+        after_block = False
         for part in block.parts:
             if isinstance(part, str):
-                if after_code:
+                if after_block:
                     part = part.lstrip("\r\n")
                 raw_result += part
                 if part:
-                    after_code = False
-            elif isinstance(part, CodeBlockNode):
-                code = "\n".join(line.text for line in _block(part))
-                if code:
-                    # Source breaks beside an atom are layout, not code. The
-                    # literal's indented payload lines themselves stay intact.
-                    raw_result = raw_result.rstrip("\r\n") + "\n\n" + code + "\n\n"
-                    after_code = True
+                    after_block = False
+            elif isinstance(part, (CodeBlockNode, Note)):
+                rendered = "\n".join(line.text for line in _block(part))
+                if rendered:
+                    # Source breaks beside a block are layout, not payload.
+                    # Its own indentation and literal lines stay intact.
+                    raw_result = raw_result.rstrip("\r\n") + "\n\n" + rendered + "\n\n"
+                    after_block = True
             else:
                 raw_result += render_inlines([part])
-                after_code = False
+                after_block = False
         return [_Line(line, True) for line in raw_result.split("\n")]
     raise TypeError(f"Unknown document block: {block!r}")
 

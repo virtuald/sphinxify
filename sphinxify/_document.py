@@ -7,6 +7,8 @@ from typing import Dict, List, Optional, Tuple, Union
 @dataclass
 class Text:
     value: str
+    # Decoded HTML entities are text, never intentional native reST delimiters.
+    plain: bool = False
 
 
 @dataclass
@@ -105,7 +107,7 @@ class Rubric:
 
 @dataclass
 class PreservedBlock:
-    parts: List[Union[str, Literal, Role, OpaqueInline, CodeBlockNode]]
+    parts: List[Union[str, Literal, Role, OpaqueInline, CodeBlockNode, Note]]
 
 
 Block = Union[
@@ -123,6 +125,8 @@ Block = Union[
 @dataclass
 class SourceText:
     text: str
+    # HTML tags/inline-code regions must not be split by comment line routing.
+    protected: bool = False
 
 
 @dataclass

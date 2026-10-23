@@ -26,11 +26,28 @@ class CodeBlockReplacement:
 
 CodeBlockTransform = Callable[[CodeBlock], Optional[CodeBlockReplacement]]
 
+# Inline code is opaque to both block recognition and comment routing.
+_HTML_INLINE = (
+    r"<(?P<inline_tag>(?i:code|tt))\b(?:\"[^\"]*\"|'[^']*'|[^'\">])*>"
+    r"(?s:.*?)</(?i:(?P=inline_tag))\s*>"
+)
+
+_HTML_TAG = r"<!--(?s:.*?)--\s*>|<[A-Za-z/!](?:\"[^\"]*\"|'[^']*'|[^'\">])*>"
+_RST_LITERAL = r"(?<!`)``(?!`)(?s:.*?)``(?!`)"
+_RST_ROLE = r":(?:[\w-]+:)?[\w-]+:`(?:\\.|[^`])*`"
+
 _OPEN = re.compile(
-    r"(?P<inline>\{@code [^}]+\})"
+    r"(?P<inline>\{@code [^}]+\}|"
+    + _HTML_INLINE
+    + "|"
+    + _RST_LITERAL
+    + "|"
+    + _RST_ROLE
+    + r")"
     r"|(?P<doxygen>(?:\\code\b|(?<![\w{])@code\b)(?:\{(?P<doxygen_lang>[^}\n]*)\})?)"
     r"|(?P<pre><pre>(?:[ \t\r\n]*(?P<html_code><code>))?)"
-    r"|(?P<fence>^[ \t]*(?P<ticks>`{3,}|~{3,})(?P<fence_lang>[^\n]*)\n)",
+    r"|(?P<fence>^[ \t]*(?P<ticks>`{3,}|~{3,})(?P<fence_lang>[^\n]*)\n)"
+    r"|(?P<html_tag>" + _HTML_TAG + ")",
     re.MULTILINE,
 )
 
@@ -77,8 +94,10 @@ def split_comment(txt: str) -> List[Union[str, CodeBlock]]:
     pos = index = 0
     while True:
         opening = _OPEN.search(txt, pos)
-        # Inline Javadoc examples stay in prose, including any block markers.
-        while opening is not None and opening.group("inline"):
+        # Inline examples stay in prose, including any apparent block markers.
+        while opening is not None and (
+            opening.group("inline") or opening.group("html_tag")
+        ):
             opening = _OPEN.search(txt, opening.end())
         if opening is None:
             if pos < len(txt):

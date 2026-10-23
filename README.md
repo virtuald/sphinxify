@@ -41,8 +41,13 @@ reST cannot represent arbitrary nested inline formatting. Link labels are flatte
 to plain text; formatting wrappers containing links, literals, or roles are omitted
 while their content is retained. Other nested styles become flat runs (strong takes
 precedence over emphasis; the innermost sub/sup takes precedence over both).
-HTML, Javadoc, and native reST inline literals share the same handling. The writer
-escapes delimiters and adds invisible boundaries without adding visible spaces.
+HTML, Javadoc, and native reST inline literals share the same whitespace
+normalization: wrapping and repeated whitespace collapse to single spaces.
+Their contents are protected before recognizing documentation commands, so example
+text cannot become a note, field, or code-block command. Block examples retain
+payload whitespace exactly. The writer escapes delimiters and adds invisible
+boundaries without adding visible spaces; decoded HTML entities remain text rather
+than acquiring native reST formatting semantics.
 
 ## Transforming code examples
 
