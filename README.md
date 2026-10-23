@@ -22,7 +22,9 @@ There is also a `sphinxify yaml` mode for the [robotpy-ctre][].
 
 ## HTML in comments
 
-HTML is parsed with Python's standard-library `HTMLParser`. Simple rectangular
+Comments are parsed into structured sections, notes, and protected code atoms.
+HTML is tokenized with Python's standard-library `HTMLParser`, normalized into a
+document tree, and serialized by a single reST writer. Simple rectangular
 `<table>` elements become reST `list-table` directives, including captions and
 leading `<th>` header rows. Inline formatting, links, `<code>`/`<tt>`, paragraphs,
 line breaks, ordered/unordered lists, and definition lists are supported.
@@ -30,7 +32,17 @@ HTML headings become reST rubrics, suitable for embedding in API docstrings.
 
 Nested tables, merged cells (`rowspan`/`colspan`), and incomplete or irregular
 tables are left as HTML rather than losing their contents. Unknown tags are
-preserved, including C++ template arguments. Code blocks bypass HTML conversion.
+preserved, including C++ template arguments. Prose and code between list entries
+are retained in source order. HTML that crosses a note boundary incompatibly is
+preserved rather than silently moving its content into or out of the note.
+Code blocks remain opaque through parsing, layout, and final field assembly.
+
+reST cannot represent arbitrary nested inline formatting. Link labels are flattened
+to plain text; formatting wrappers containing links, literals, or roles are omitted
+while their content is retained. Other nested styles become flat runs (strong takes
+precedence over emphasis; the innermost sub/sup takes precedence over both).
+HTML, Javadoc, and native reST inline literals share the same handling. The writer
+escapes delimiters and adds invisible boundaries without adding visible spaces.
 
 ## Transforming code examples
 

@@ -122,7 +122,7 @@ def _inline(node: ParsedNode, in_cell: bool = False) -> List[Inline]:
         return [Link(" ".join(_plain(node).split()), node.attrs["href"])]
     children = [inline for child in node.children for inline in _inline(child, in_cell)]
     if node.tag in _INLINE:
-        return [Style(_INLINE[node.tag][1], children)]
+        return [Style(_INLINE[node.tag], children)]
     if node.tag in {"sub", "sup"}:
         return [Style(node.tag, children)]
     return children
@@ -153,10 +153,12 @@ def _lower(children: Sequence[ParsedNode], in_cell: bool = False) -> List[Block]
     result: List[Block] = []
     pending: List[Inline] = []
 
-    def flush():
+    def flush(preserve_break: bool = False):
+        trailing_break = bool(pending and isinstance(pending[-1], Text)
+                              and pending[-1].value.rstrip(" \t").endswith("\n"))
         trimmed = _trim_inlines(pending)
         if trimmed:
-            result.append(Paragraph(trimmed))
+            result.append(Paragraph(trimmed, source_break_after=preserve_break and trailing_break))
         pending.clear()
 
     for child in children:
@@ -177,7 +179,7 @@ def _lower(children: Sequence[ParsedNode], in_cell: bool = False) -> List[Block]
             flush()
             result.append(PreservedBlock(_raw_parts(child)))
         elif isinstance(child, HtmlElement) and child.tag in {"p", "ul", "ol", "dl", "li", "table", "h1", "h2", "h3", "h4", "h5", "h6"}:
-            flush()
+            flush(preserve_break=True)
             if child.tag == "p":
                 blocks = _lower(child.children, in_cell)
                 for block in blocks:

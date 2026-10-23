@@ -83,11 +83,12 @@ def render_inlines(nodes: Sequence[Inline]) -> str:
 class _Line:
     text: str
     payload: bool = False
+    source_blank: bool = False
 
 
-def _indent(lines: Sequence[_Line], width: int) -> List[_Line]:
-    return [_Line(" " * width + line.text if line.text or line.payload else "", line.payload)
-            for line in lines]
+def _indent(lines: Sequence[_Line], width: int, source_blanks: bool = False) -> List[_Line]:
+    return [_Line(" " * width + line.text if line.text or line.payload or (source_blanks and line.source_blank) else "",
+                  line.payload, line.source_blank) for line in lines]
 
 
 def _blocks(blocks: Sequence[Block]) -> List[_Line]:
@@ -105,7 +106,7 @@ def _blocks(blocks: Sequence[Block]) -> List[_Line]:
 def _block(block: Block) -> List[_Line]:
     if isinstance(block, Paragraph):
         text = render_inlines(block.inlines)
-        lines = [_Line(line.rstrip()) for line in text.split("\n")]
+        lines = [_Line(line.rstrip(), source_blank=not line.strip()) for line in text.split("\n")]
         while lines and not lines[0].text:
             lines.pop(0)
         while lines and not lines[-1].text:
@@ -127,9 +128,11 @@ def _block(block: Block) -> List[_Line]:
         raw_header = isinstance(first, PreservedBlock) and not any(
             isinstance(part, CodeBlockNode) for part in first.parts
         )
+        if isinstance(first, Paragraph) and first.source_break_after and len(block.blocks) > 1:
+            body.insert(len(_block(first)), _Line("", source_blank=True))
         if inline_header or raw_header:
-            return [_Line(".. note:: " + body[0].text, body[0].payload)] + _indent(body[1:], 3)
-        return [_Line(".. note::"), _Line("")] + _indent(body, 3)
+            return [_Line(".. note:: " + body[0].text, body[0].payload)] + _indent(body[1:], 3, True)
+        return [_Line(".. note::"), _Line("")] + _indent(body, 3, True)
     if isinstance(block, ListBlock):
         marker = "#. " if block.ordered else "- "
         result = []

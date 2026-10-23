@@ -55,6 +55,7 @@ Inline = Union[Text, Literal, Link, Role, OpaqueInline, SoftBreak, HardBreak, St
 class Paragraph:
     inlines: List[Inline]
     explicit: bool = False
+    source_break_after: bool = False
 
 
 @dataclass
