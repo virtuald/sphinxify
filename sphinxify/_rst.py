@@ -6,9 +6,24 @@ from string import punctuation
 from typing import List, Sequence
 
 from ._document import (
-    Block, CodeBlockNode, DefinitionList, HardBreak, Inline, Link, ListBlock,
-    Literal, Note, OpaqueInline, Paragraph, PreservedBlock, Role, Rubric,
-    SoftBreak, Style, Table, Text,
+    Block,
+    CodeBlockNode,
+    DefinitionList,
+    HardBreak,
+    Inline,
+    Link,
+    ListBlock,
+    Literal,
+    Note,
+    OpaqueInline,
+    Paragraph,
+    PreservedBlock,
+    Role,
+    Rubric,
+    SoftBreak,
+    Style,
+    Table,
+    Text,
 )
 
 
@@ -40,7 +55,8 @@ def render_inlines(nodes: Sequence[Inline]) -> str:
                 continue
             text = (
                 ":literal:`" + _label(node.value) + "`"
-                if "``" in node.value else "``" + node.value + "``"
+                if "``" in node.value
+                else "``" + node.value + "``"
             )
             token = _Token(text, True)
         elif isinstance(node, Link):
@@ -48,10 +64,10 @@ def render_inlines(nodes: Sequence[Inline]) -> str:
         elif isinstance(node, Role):
             token = _Token(f":{node.name}:`{_label(node.target)}`", True)
         elif isinstance(node, Style):
-            value = "".join(child.value for child in node.children if isinstance(child, Text))
-            if node.kind in {"sup", "sub"}:
-                text = f":{node.kind}:`{_label(value)}`"
-            elif "\n" in value:
+            value = "".join(
+                child.value for child in node.children if isinstance(child, Text)
+            )
+            if node.kind in {"sup", "sub"} or "\n" in value:
                 text = f":{node.kind}:`{_label(value)}`"
             else:
                 marker = "**" if node.kind == "strong" else "*"
@@ -71,8 +87,14 @@ def render_inlines(nodes: Sequence[Inline]) -> str:
             before = result[-1][-1]
             after = token.text[0]
             previous = tokens[index - 1]
-            needs_start = token.markup and not before.isspace() and before not in "\"'(<[{-/:"
-            needs_end = previous.markup and not after.isspace() and after not in "\"')>]}-/:.,;!?\\"
+            needs_start = (
+                token.markup and not before.isspace() and before not in "\"'(<[{-/:"
+            )
+            needs_end = (
+                previous.markup
+                and not after.isspace()
+                and after not in "\"')>]}-/:.,;!?\\"
+            )
             if needs_start or needs_end:
                 result.append("\\ ")
         result.append(token.text)
@@ -86,9 +108,21 @@ class _Line:
     source_blank: bool = False
 
 
-def _indent(lines: Sequence[_Line], width: int, source_blanks: bool = False) -> List[_Line]:
-    return [_Line(" " * width + line.text if line.text or line.payload or (source_blanks and line.source_blank) else "",
-                  line.payload, line.source_blank) for line in lines]
+def _indent(
+    lines: Sequence[_Line], width: int, source_blanks: bool = False
+) -> List[_Line]:
+    return [
+        _Line(
+            (
+                " " * width + line.text
+                if line.text or line.payload or (source_blanks and line.source_blank)
+                else ""
+            ),
+            line.payload,
+            line.source_blank,
+        )
+        for line in lines
+    ]
 
 
 def _blocks(blocks: Sequence[Block]) -> List[_Line]:
@@ -106,7 +140,10 @@ def _blocks(blocks: Sequence[Block]) -> List[_Line]:
 def _block(block: Block) -> List[_Line]:
     if isinstance(block, Paragraph):
         text = render_inlines(block.inlines)
-        lines = [_Line(line.rstrip(), source_blank=not line.strip()) for line in text.split("\n")]
+        lines = [
+            _Line(line.rstrip(), source_blank=not line.strip())
+            for line in text.split("\n")
+        ]
         while lines and not lines[0].text:
             lines.pop(0)
         while lines and not lines[-1].text:
@@ -128,14 +165,20 @@ def _block(block: Block) -> List[_Line]:
         raw_header = isinstance(first, PreservedBlock) and not any(
             isinstance(part, CodeBlockNode) for part in first.parts
         )
-        if isinstance(first, Paragraph) and first.source_break_after and len(block.blocks) > 1:
+        if (
+            isinstance(first, Paragraph)
+            and first.source_break_after
+            and len(block.blocks) > 1
+        ):
             body.insert(len(_block(first)), _Line("", source_blank=True))
         if inline_header or raw_header:
-            return [_Line(".. note:: " + body[0].text, body[0].payload)] + _indent(body[1:], 3, True)
+            return [_Line(".. note:: " + body[0].text, body[0].payload)] + _indent(
+                body[1:], 3, True
+            )
         return [_Line(".. note::"), _Line("")] + _indent(body, 3, True)
     if isinstance(block, ListBlock):
         marker = "#. " if block.ordered else "- "
-        result = []
+        result: List[_Line] = []
         previous_size = 0
         for item in block.items:
             lines = _blocks(item.blocks) or [_Line("")]
@@ -148,7 +191,9 @@ def _block(block: Block) -> List[_Line]:
     if isinstance(block, DefinitionList):
         result = []
         for entry in block.entries:
-            result.extend(_Line(line) for line in render_inlines(entry.term).split("\n"))
+            result.extend(
+                _Line(line) for line in render_inlines(entry.term).split("\n")
+            )
             result.extend(_indent(_blocks(entry.blocks), 3))
         return result
     if isinstance(block, Table):
@@ -162,26 +207,45 @@ def _block(block: Block) -> List[_Line]:
                 lines = _blocks(cell) or [_Line("")]
                 marker = "   * -" if index == 0 else "     -"
                 first_text = lines[0].text
-                if len(lines) == 1 and first_text and len(set(first_text)) == 1 and first_text[0] in punctuation:
+                if (
+                    len(lines) == 1
+                    and first_text
+                    and len(set(first_text)) == 1
+                    and first_text[0] in punctuation
+                ):
                     first_text = "\\" + first_text
-                result.append(_Line(marker + (" " + first_text if first_text else ""), lines[0].payload))
+                result.append(
+                    _Line(
+                        marker + (" " + first_text if first_text else ""),
+                        lines[0].payload,
+                    )
+                )
                 result.extend(_indent(lines[1:], 7))
         return result
     if isinstance(block, Rubric):
         return [_Line(".. rubric:: " + " ".join(render_inlines(block.inlines).split()))]
     if isinstance(block, PreservedBlock):
         # Raw source and semantic atoms remain distinct until this final write.
-        result = ""
+        raw_result = ""
+        after_code = False
         for part in block.parts:
             if isinstance(part, str):
-                result += part
+                if after_code:
+                    part = part.lstrip("\r\n")
+                raw_result += part
+                if part:
+                    after_code = False
             elif isinstance(part, CodeBlockNode):
                 code = "\n".join(line.text for line in _block(part))
                 if code:
-                    result += "\n\n" + code + "\n\n"
+                    # Source breaks beside an atom are layout, not code. The
+                    # literal's indented payload lines themselves stay intact.
+                    raw_result = raw_result.rstrip("\r\n") + "\n\n" + code + "\n\n"
+                    after_code = True
             else:
-                result += render_inlines([part])
-        return [_Line(line, True) for line in result.split("\n")]
+                raw_result += render_inlines([part])
+                after_code = False
+        return [_Line(line, True) for line in raw_result.split("\n")]
     raise TypeError(f"Unknown document block: {block!r}")
 
 

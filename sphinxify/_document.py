@@ -108,7 +108,16 @@ class PreservedBlock:
     parts: List[Union[str, Literal, Role, OpaqueInline, CodeBlockNode]]
 
 
-Block = Union[Paragraph, Note, CodeBlockNode, ListBlock, DefinitionList, Table, Rubric, PreservedBlock]
+Block = Union[
+    Paragraph,
+    Note,
+    CodeBlockNode,
+    ListBlock,
+    DefinitionList,
+    Table,
+    Rubric,
+    PreservedBlock,
+]
 
 
 @dataclass
@@ -126,7 +135,9 @@ class ExitNote:
     pass
 
 
-SourcePart = Union[SourceText, EnterNote, ExitNote, Literal, Role, OpaqueInline, CodeBlockNode]
+SourcePart = Union[
+    SourceText, EnterNote, ExitNote, Literal, Role, OpaqueInline, CodeBlockNode
+]
 
 
 @dataclass
@@ -162,7 +173,9 @@ class HtmlNote:
     children: List["ParsedNode"] = field(default_factory=list)
 
 
-ParsedNode = Union[HtmlText, HtmlElement, HtmlNote, Literal, Role, OpaqueInline, CodeBlockNode]
+ParsedNode = Union[
+    HtmlText, HtmlElement, HtmlNote, Literal, Role, OpaqueInline, CodeBlockNode
+]
 
 
 @dataclass

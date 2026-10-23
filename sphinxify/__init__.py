@@ -5,7 +5,9 @@ import warnings
 from dataclasses import dataclass
 from typing import Callable, Dict, List, Optional
 
-from ._codeblocks import CodeBlock, CodeBlockReplacement, CodeBlockTransform
+from ._codeblocks import CodeBlock as CodeBlock
+from ._codeblocks import CodeBlockReplacement as CodeBlockReplacement
+from ._codeblocks import CodeBlockTransform
 from ._comment import parse_comment
 from ._document import SectionSource
 from ._html import parse_html
@@ -75,9 +77,20 @@ class Doc:
 
         return cls(
             render(sections.desc),
-            [Param(name, render(section).split("\n")) for name, section in sections.params],
-            render(sections.returns).split("\n") if sections.returns is not None else [],
-            render(sections.deprecated).split("\n") if sections.deprecated is not None else None,
+            [
+                Param(name, render(section).split("\n"))
+                for name, section in sections.params
+            ],
+            (
+                render(sections.returns).split("\n")
+                if sections.returns is not None
+                else []
+            ),
+            (
+                render(sections.deprecated).split("\n")
+                if sections.deprecated is not None
+                else None
+            ),
         )
 
     def get_param(self, name: str) -> Optional[Param]:

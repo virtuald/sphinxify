@@ -5,8 +5,15 @@ from typing import Callable, List, Optional, Union
 
 from ._codeblocks import CodeBlock, CodeBlockTransform, split_comment
 from ._document import (
-    CodeBlockNode, EnterNote, ExitNote, Literal, Role, SectionSource,
-    SourcePart, SourceSections, SourceText,
+    CodeBlockNode,
+    EnterNote,
+    ExitNote,
+    Literal,
+    Role,
+    SectionSource,
+    SourcePart,
+    SourceSections,
+    SourceText,
 )
 
 # HTML tags are consumed whole so quoted attributes do not become inline atoms.
@@ -41,14 +48,14 @@ def _tokenize(text: str, fix: Callable[[str], str]) -> List[SourcePart]:
     position = 0
     for match in _INLINE_TOKEN.finditer(text):
         if match.start() > position:
-            result.append(SourceText(text[position:match.start()]))
+            result.append(SourceText(text[position : match.start()]))
         raw = match[0]
         if match.group("code"):
-            result.append(Literal(raw[len("{@code "):-1]))
+            result.append(Literal(raw[len("{@code ") : -1]))
         elif match.group("literal"):
             result.append(Literal(raw[2:-2], source=raw))
         elif match.group("link"):
-            result.append(_link(raw[len("{@link "):-1], fix) or SourceText(raw))
+            result.append(_link(raw[len("{@link ") : -1], fix) or SourceText(raw))
         elif match.group("role"):
             name, target = raw[1:].split(":`", 1)
             result.append(Role(name, re.sub(r"\\(.)", r"\1", target[:-1])))
@@ -124,8 +131,14 @@ def parse_comment(
             if line.endswith("</p>"):
                 line = line[:-4].rstrip()
         if not line:
-            following = next((item for item in lines[index + 1:]
-                              if isinstance(item, CodeBlock) or item.strip()), None)
+            following = next(
+                (
+                    item
+                    for item in lines[index + 1 :]
+                    if isinstance(item, CodeBlock) or item.strip()
+                ),
+                None,
+            )
             if not isinstance(following, CodeBlock):
                 if note_owner is not None:
                     close_note()
@@ -134,18 +147,18 @@ def parse_comment(
         if line.startswith((r"\fn ", r"\class ")):
             continue
         if line.startswith(("@brief ", r"\brief ")):
-            line = line[len("@brief "):]
+            line = line[len("@brief ") :]
         elif line.startswith(r"\enum "):
             line = " ".join(line.split()[2:])
         elif line == "@deprecated" or line.startswith("@deprecated "):
             close_note()
             sections.deprecated = current = SectionSource()
-            line = line[len("@deprecated "):]
+            line = line[len("@deprecated ") :]
         elif line == "@note" or line.startswith("@note "):
             close_note()
             current.parts.append(EnterNote())
             note_owner = current
-            line = line[len("@note "):]
+            line = line[len("@note ") :]
         else:
             param = re.search(r"^[\\@]param\W+(\w+)", line)
             if param:
@@ -165,7 +178,11 @@ def parse_comment(
             line = "-" + line[3:]
         append_line([SourceText(line.strip())])
     close_note()
-    for section in [sections.desc] + [p[1] for p in sections.params] + [sections.returns, sections.deprecated]:
+    for section in (
+        [sections.desc]
+        + [p[1] for p in sections.params]
+        + [sections.returns, sections.deprecated]
+    ):
         if section is not None:
             _inline_atoms(section, fix_method_name)
     return sections

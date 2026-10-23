@@ -3,14 +3,33 @@
 import re
 from typing import List, Optional, Sequence
 
-from ._html import _INLINE, _unescape
-
 from ._document import (
-    Block, CodeBlockNode, DefinitionEntry, DefinitionList, HardBreak, HtmlElement,
-    HtmlNote, HtmlText, Inline, Link, ListBlock, ListItem, Literal, Note,
-    OpaqueInline, Paragraph, ParsedNode, ParsedSection, PreservedBlock, Role,
-    Rubric, Style, Table, Text,
+    Block,
+    CodeBlockNode,
+    DefinitionEntry,
+    DefinitionList,
+    HardBreak,
+    HtmlElement,
+    HtmlNote,
+    HtmlText,
+    Inline,
+    Link,
+    ListBlock,
+    ListItem,
+    Literal,
+    Note,
+    OpaqueInline,
+    Paragraph,
+    ParsedNode,
+    ParsedSection,
+    PreservedBlock,
+    Role,
+    Rubric,
+    Style,
+    Table,
+    Text,
 )
+from ._html import _INLINE, _unescape
 
 
 def _atomic(node: Inline) -> bool:
@@ -45,16 +64,38 @@ def normalize_inlines(nodes: Sequence[Inline]) -> List[Inline]:
                     visit(child.children)
                 else:
                     active = child.kind
-                    if style in {"sub", "sup"} and active not in {"sub", "sup"}:
-                        active = style
-                    elif style == "strong" and active == "emphasis":
+                    if (
+                        style in {"sub", "sup"}
+                        and active not in {"sub", "sup"}
+                        or style == "strong"
+                        and active == "emphasis"
+                    ):
                         active = style
                     visit(child.children, active)
             else:
                 append(child, style)
 
     visit(nodes)
-    return result
+    spaced: List[Inline] = []
+    for node in result:
+        if isinstance(node, Style):
+            value = "".join(
+                child.value for child in node.children if isinstance(child, Text)
+            )
+            body = value.strip()
+            if not body:
+                spaced.append(Text(value))
+                continue
+            leading = value[: len(value) - len(value.lstrip())]
+            trailing = value[len(value.rstrip()) :]
+            if leading:
+                spaced.append(Text(leading))
+            spaced.append(Style(node.kind, [Text(body)]))
+            if trailing:
+                spaced.append(Text(trailing))
+        else:
+            spaced.append(node)
+    return spaced
 
 
 def _raw_parts(node: ParsedNode):
@@ -117,7 +158,13 @@ def _inline(node: ParsedNode, in_cell: bool = False) -> List[Inline]:
     if not node.closing:
         return [OpaqueInline(_raw_text(node))]
     if node.tag in {"code", "tt"}:
-        return [Literal(" ".join(_unescape("".join(_raw_text(c) for c in node.children)).split()))]
+        return [
+            Literal(
+                " ".join(
+                    _unescape("".join(_raw_text(c) for c in node.children)).split()
+                )
+            )
+        ]
     if node.tag == "a" and node.attrs.get("href"):
         return [Link(" ".join(_plain(node).split()), node.attrs["href"])]
     children = [inline for child in node.children for inline in _inline(child, in_cell)]
@@ -154,11 +201,16 @@ def _lower(children: Sequence[ParsedNode], in_cell: bool = False) -> List[Block]
     pending: List[Inline] = []
 
     def flush(preserve_break: bool = False):
-        trailing_break = bool(pending and isinstance(pending[-1], Text)
-                              and pending[-1].value.rstrip(" \t").endswith("\n"))
+        trailing_break = bool(
+            pending
+            and isinstance(pending[-1], Text)
+            and pending[-1].value.rstrip(" \t").endswith("\n")
+        )
         trimmed = _trim_inlines(pending)
         if trimmed:
-            result.append(Paragraph(trimmed, source_break_after=preserve_break and trailing_break))
+            result.append(
+                Paragraph(trimmed, source_break_after=preserve_break and trailing_break)
+            )
         pending.clear()
 
     for child in children:
@@ -178,7 +230,20 @@ def _lower(children: Sequence[ParsedNode], in_cell: bool = False) -> List[Block]
         elif isinstance(child, HtmlElement) and child.preserve:
             flush()
             result.append(PreservedBlock(_raw_parts(child)))
-        elif isinstance(child, HtmlElement) and child.tag in {"p", "ul", "ol", "dl", "li", "table", "h1", "h2", "h3", "h4", "h5", "h6"}:
+        elif isinstance(child, HtmlElement) and child.tag in {
+            "p",
+            "ul",
+            "ol",
+            "dl",
+            "li",
+            "table",
+            "h1",
+            "h2",
+            "h3",
+            "h4",
+            "h5",
+            "h6",
+        }:
             flush(preserve_break=True)
             if child.tag == "p":
                 blocks = _lower(child.children, in_cell)
@@ -191,11 +256,19 @@ def _lower(children: Sequence[ParsedNode], in_cell: bool = False) -> List[Block]
             elif child.tag == "dl":
                 result.extend(_definitions(child, in_cell))
             elif child.tag == "li":
-                result.append(ListBlock(False, [ListItem(_lower(child.children, in_cell))]))
+                result.append(
+                    ListBlock(False, [ListItem(_lower(child.children, in_cell))])
+                )
             elif child.tag == "table":
                 result.append(_table(child))
             else:
-                result.append(Rubric(normalize_inlines([i for c in child.children for i in _inline(c, True)])))
+                result.append(
+                    Rubric(
+                        normalize_inlines(
+                            [i for c in child.children for i in _inline(c, True)]
+                        )
+                    )
+                )
         else:
             pending.extend(_inline(child, in_cell))
     flush()
@@ -258,7 +331,9 @@ def _definitions(element: HtmlElement, in_cell: bool) -> List[Block]:
             if child.tag == "dt":
                 if term is not None:
                     flush_entries()
-                term = _trim_inlines([i for c in child.children for i in _inline(c, in_cell)])
+                term = _trim_inlines(
+                    [i for c in child.children for i in _inline(c, in_cell)]
+                )
             elif term is not None:
                 entries.append(DefinitionEntry(term, _lower(child.children, in_cell)))
                 term = None
@@ -279,7 +354,11 @@ def _table(element: HtmlElement) -> Block:
 
     def collect(parent: HtmlElement) -> bool:
         nonlocal caption
-        allowed = {"tr", "thead", "tbody", "tfoot", "caption"} if parent.tag == "table" else {"tr"}
+        allowed = (
+            {"tr", "thead", "tbody", "tfoot", "caption"}
+            if parent.tag == "table"
+            else {"tr"}
+        )
         for child in parent.children:
             if isinstance(child, HtmlText) and not child.source.strip():
                 continue
@@ -290,23 +369,41 @@ def _table(element: HtmlElement) -> Block:
                 for cell in child.children:
                     if isinstance(cell, HtmlText) and not cell.source.strip():
                         continue
-                    if not isinstance(cell, HtmlElement) or cell.tag not in {"td", "th"}:
+                    if not isinstance(cell, HtmlElement) or cell.tag not in {
+                        "td",
+                        "th",
+                    }:
                         return False
                     row.append(cell)
                 rows.append(row)
             elif child.tag == "caption":
-                caption = normalize_inlines([i for c in child.children for i in _inline(c, True)])
+                caption = normalize_inlines(
+                    [i for c in child.children for i in _inline(c, True)]
+                )
             elif not collect(child):
                 return False
         return True
 
     def unsupported(parent: HtmlElement) -> bool:
-        return any(isinstance(child, HtmlElement) and (
-            child.tag == "table" or "colspan" in child.attrs or "rowspan" in child.attrs or unsupported(child)
-        ) for child in parent.children)
+        return any(
+            isinstance(child, HtmlElement)
+            and (
+                child.tag == "table"
+                or "colspan" in child.attrs
+                or "rowspan" in child.attrs
+                or unsupported(child)
+            )
+            for child in parent.children
+        )
 
-    if (not element.closing or not collect(element) or unsupported(element) or not rows
-            or not rows[0] or any(len(row) != len(rows[0]) for row in rows)):
+    if (
+        not element.closing
+        or not collect(element)
+        or unsupported(element)
+        or not rows
+        or not rows[0]
+        or any(len(row) != len(rows[0]) for row in rows)
+    ):
         return PreservedBlock(_raw_parts(element))
     headers = 0
     for row in rows:
@@ -315,7 +412,11 @@ def _table(element: HtmlElement) -> Block:
         headers += 1
     if headers == len(rows):
         return PreservedBlock(_raw_parts(element))
-    return Table([[_lower(cell.children, True) for cell in row] for row in rows], headers, caption)
+    return Table(
+        [[_lower(cell.children, True) for cell in row] for row in rows],
+        headers,
+        caption,
+    )
 
 
 def normalize_html(section: ParsedSection) -> List[Block]:

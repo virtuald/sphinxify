@@ -4,21 +4,50 @@ import re
 from html import unescape
 from html.entities import html5
 from html.parser import HTMLParser
+from typing import Dict, List, Union
 
 from ._document import (
-    EnterNote, ExitNote, HtmlElement, HtmlNote, HtmlText, OpaqueInline,
-    ParsedSection, SectionSource, SourceText,
+    EnterNote,
+    ExitNote,
+    HtmlElement,
+    HtmlNote,
+    HtmlText,
+    OpaqueInline,
+    ParsedSection,
+    SectionSource,
+    SourcePart,
+    SourceText,
 )
 
 _INLINE = {
-    "b": "strong", "strong": "strong",
-    "i": "emphasis", "em": "emphasis",
+    "b": "strong",
+    "strong": "strong",
+    "i": "emphasis",
+    "em": "emphasis",
 }
 _BLOCKS = {"table", "p", "ul", "ol", "dl", "h1", "h2", "h3", "h4", "h5", "h6"}
-_TAGS = _BLOCKS | set(_INLINE) | {
-    "thead", "tbody", "tfoot", "tr", "td", "th", "caption", "li", "dt", "dd",
-    "a", "code", "tt", "sub", "sup", "br",
-}
+_TAGS = (
+    _BLOCKS
+    | set(_INLINE)
+    | {
+        "thead",
+        "tbody",
+        "tfoot",
+        "tr",
+        "td",
+        "th",
+        "caption",
+        "li",
+        "dt",
+        "dd",
+        "a",
+        "code",
+        "tt",
+        "sub",
+        "sup",
+        "br",
+    }
+)
 
 
 def _unescape(text: str) -> str:
@@ -28,18 +57,25 @@ def _unescape(text: str) -> str:
         if name.startswith("#"):
             return unescape(match[0])
         return html5.get(name + ";", match[0])
-    return re.sub(r"&(#(?:[xX][0-9a-fA-F]+|[0-9]+)|[A-Za-z][A-Za-z0-9]*);", replace, text)
+
+    return re.sub(
+        r"&(#(?:[xX][0-9a-fA-F]+|[0-9]+)|[A-Za-z][A-Za-z0-9]*);", replace, text
+    )
 
 
 class _SourceParser(HTMLParser):
     def __init__(self, source: SectionSource):
         super().__init__(convert_charrefs=False)
         prefix = "\x00sphinxify-node-"
-        values = [value for part in source.parts for value in vars(part).values()
-                  if isinstance(value, str)]
+        values = [
+            value
+            for part in source.parts
+            for value in vars(part).values()
+            if isinstance(value, str)
+        ]
         while any(prefix in value for value in values):
             prefix += "-"
-        self.atoms = {}
+        self.atoms: Dict[str, SourcePart] = {}
         text = []
         for part in source.parts:
             if isinstance(part, SourceText):
@@ -49,9 +85,13 @@ class _SourceParser(HTMLParser):
                 self.atoms[key] = part
                 text.append(key)
         self.source = "".join(text)
-        self.pattern = re.compile("(" + "|".join(map(re.escape, self.atoms)) + ")") if self.atoms else None
+        self.pattern = (
+            re.compile("(" + "|".join(map(re.escape, self.atoms)) + ")")
+            if self.atoms
+            else None
+        )
         self.root = ParsedSection()
-        self.stack = [self.root]
+        self.stack: List[Union[ParsedSection, HtmlElement, HtmlNote]] = [self.root]
         self.offsets = [0]
         for line in self.source.split("\n"):
             self.offsets.append(self.offsets[-1] + len(line) + 1)
@@ -59,7 +99,7 @@ class _SourceParser(HTMLParser):
         self.feed(self.source)
         self.close()
         if self.consumed < len(self.source):
-            self._data(self.source[self.consumed:])
+            self._data(self.source[self.consumed :])
 
     def _offset(self):
         line, col = self.getpos()
@@ -68,7 +108,7 @@ class _SourceParser(HTMLParser):
     def _record(self, raw):
         offset = self._offset()
         if offset > self.consumed:
-            self._data(self.source[self.consumed:offset])
+            self._data(self.source[self.consumed : offset])
         self.consumed = offset + len(raw)
 
     def _close_optional(self, tags, boundaries):
@@ -105,7 +145,7 @@ class _SourceParser(HTMLParser):
 
     def handle_endtag(self, tag):
         offset = self._offset()
-        raw = self.source[offset:self.source.find(">", offset) + 1]
+        raw = self.source[offset : self.source.find(">", offset) + 1]
         self._record(raw)
         for index in range(len(self.stack) - 1, 0, -1):
             element = self.stack[index]
@@ -134,8 +174,11 @@ class _SourceParser(HTMLParser):
             elif isinstance(atom, ExitNote):
                 for index in range(len(self.stack) - 1, 0, -1):
                     if isinstance(self.stack[index], HtmlNote):
-                        for open_element in self.stack[index + 1:]:
-                            if isinstance(open_element, HtmlElement) and open_element.tag != "p":
+                        for open_element in self.stack[index + 1 :]:
+                            if (
+                                isinstance(open_element, HtmlElement)
+                                and open_element.tag != "p"
+                            ):
                                 open_element.preserve = True
                         del self.stack[index:]
                         break
@@ -150,7 +193,7 @@ class _SourceParser(HTMLParser):
 
     def _reference(self, prefix, name):
         raw = prefix + name
-        if self.source[self._offset() + len(raw):].startswith(";"):
+        if self.source[self._offset() + len(raw) :].startswith(";"):
             raw += ";"
         self.handle_data(raw)
 
