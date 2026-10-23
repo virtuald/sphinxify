@@ -121,8 +121,13 @@ def _block(block: Block) -> List[_Line]:
         body = _blocks(block.blocks)
         if not body:
             return [_Line(".. note::")]
-        if isinstance(block.blocks[0], Paragraph) and not block.blocks[0].explicit:
-            return [_Line(".. note:: " + body[0].text)] + _indent(body[1:], 3)
+        first = block.blocks[0]
+        inline_header = isinstance(first, Paragraph) and not first.explicit
+        raw_header = isinstance(first, PreservedBlock) and not any(
+            isinstance(part, CodeBlockNode) for part in first.parts
+        )
+        if inline_header or raw_header:
+            return [_Line(".. note:: " + body[0].text, body[0].payload)] + _indent(body[1:], 3)
         return [_Line(".. note::"), _Line("")] + _indent(body, 3)
     if isinstance(block, ListBlock):
         marker = "#. " if block.ordered else "- "

@@ -12,6 +12,7 @@ class Text:
 @dataclass
 class Literal:
     value: str
+    source: Optional[str] = None
 
 
 @dataclass
@@ -152,6 +153,7 @@ class HtmlElement:
     children: List["ParsedNode"] = field(default_factory=list)
     opening: str = ""
     closing: str = ""
+    preserve: bool = False
 
 
 @dataclass
