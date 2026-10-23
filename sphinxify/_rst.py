@@ -2,6 +2,7 @@
 
 import re
 from dataclasses import dataclass
+from string import punctuation
 from typing import List, Sequence
 
 from ._document import (
@@ -157,7 +158,10 @@ def _block(block: Block) -> List[_Line]:
             for index, cell in enumerate(row):
                 lines = _blocks(cell) or [_Line("")]
                 marker = "   * -" if index == 0 else "     -"
-                result.append(_Line(marker + (" " + lines[0].text if lines[0].text else ""), lines[0].payload))
+                first_text = lines[0].text
+                if len(lines) == 1 and first_text and len(set(first_text)) == 1 and first_text[0] in punctuation:
+                    first_text = "\\" + first_text
+                result.append(_Line(marker + (" " + first_text if first_text else ""), lines[0].payload))
                 result.extend(_indent(lines[1:], 7))
         return result
     if isinstance(block, Rubric):
