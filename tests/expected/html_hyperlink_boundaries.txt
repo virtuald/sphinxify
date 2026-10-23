@@ -1,0 +1,23 @@
+`foo <https://example.org>`__\ bar
+
+pre\ `foo <https://example.org>`__
+
+pre\ `foo <https://example.org>`__\ post
+
+`foo <https://example.org>`__\ `bar <https://example.com>`__
+
+(`foo <https://example.org>`__), `bar <https://example.com>`__.
+
+preplainpost
+
+`root <https://example.org>`__\ text
+
+.. list-table::
+
+   * - pre\ `cell <https://example.org>`__\ post
+
+.. note::
+
+   Example
+
+   `note <https://example.org>`__\ text

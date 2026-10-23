@@ -1,0 +1,9 @@
+`\`foo\` <https://example.org>`__
+
+`foo\`bar <https://example.org>`__
+
+`\`\`foo\`\` <https://example.org>`__
+
+`\`foo\` <https://example.org>`__
+
+`foo\`bar <https://example.org>`__

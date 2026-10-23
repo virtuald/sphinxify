@@ -1,0 +1,31 @@
+Intro & *context*.
+
+- before
+
+Between items.
+
+::
+
+   code
+
+- after
+
+Outro.
+
+#. first
+
+A paragraph.
+
+#. last
+
+Only prose & ``code``.
+
+.. note::
+
+   - before
+
+   ::
+
+      example
+
+   - after

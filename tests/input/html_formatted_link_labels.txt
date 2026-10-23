@@ -1,0 +1,3 @@
+<p><a href="https://example.com"><code>Foo</code></a></p>
+<p><a href="https://example.com">Use <strong>bold</strong>, <em>emphasis</em>, and <tt>code</tt></a></p>
+<p><a href="https://example.com"><strong><code>Foo</code> &amp; <em>Bar</em></strong></a></p>

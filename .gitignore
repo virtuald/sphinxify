@@ -101,3 +101,9 @@ ENV/
 
 # mypy
 .mypy_cache/
+
+# Isolated development workspaces
+.worktrees/
+
+# Local agent planning artifacts
+/docs/superpowers/

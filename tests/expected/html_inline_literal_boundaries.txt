@@ -1,0 +1,21 @@
+``Foo``\ s
+
+pre\ ``Foo``
+
+pre\ ``Foo``\ post
+
+``Foo``\ ``Bar``
+
+(``Foo``), ``Bar``.
+
+``Root``\ s
+
+.. list-table::
+
+   * - pre\ ``Cell``\ post
+
+.. note::
+
+   Example
+
+   ``Note``\ s

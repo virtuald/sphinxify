@@ -1,0 +1,9 @@
+<p><a href="https://example.org">foo</a>bar</p>
+<p>pre<a href="https://example.org">foo</a></p>
+<p>pre<a href="https://example.org">foo</a>post</p>
+<p><a href="https://example.org">foo</a><a href="https://example.com">bar</a></p>
+<p>(<a href="https://example.org">foo</a>), <a href="https://example.com">bar</a>.</p>
+<p>pre<a id="anchor">plain</a>post</p>
+<a href="https://example.org">root</a>text
+<table><tr><td>pre<a href="https://example.org">cell</a>post</td></tr></table>
+@note <p>Example</p><a href="https://example.org">note</a>text

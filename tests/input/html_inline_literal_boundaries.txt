@@ -1,0 +1,8 @@
+<p><code>Foo</code>s</p>
+<p>pre<tt>Foo</tt></p>
+<p>pre<code>Foo</code>post</p>
+<p><code>Foo</code><tt>Bar</tt></p>
+<p>(<code>Foo</code>), <tt>Bar</tt>.</p>
+<code>Root</code>s
+<table><tr><td>pre<code>Cell</code>post</td></tr></table>
+@note <p>Example</p><code>Note</code>s

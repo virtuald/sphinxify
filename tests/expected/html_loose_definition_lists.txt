@@ -1,0 +1,26 @@
+Intro & *context*.
+
+Term
+   Definition
+
+Between entries.
+
+::
+
+   sample
+
+Next
+   Other
+
+Outro.
+
+Only prose & ``code``.
+
+.. note::
+
+   Term
+      Definition
+
+   ::
+
+      example

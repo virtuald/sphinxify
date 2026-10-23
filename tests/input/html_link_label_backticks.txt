@@ -1,0 +1,5 @@
+<p><a href="https://example.org">`foo`</a></p>
+<p><a href="https://example.org">foo`bar</a></p>
+<p><a href="https://example.org">``foo``</a></p>
+<p><a href="https://example.org"><code>`foo`</code></a></p>
+<p><a href="https://example.org">foo&#96;bar</a></p>

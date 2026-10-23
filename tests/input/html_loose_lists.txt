@@ -1,0 +1,4 @@
+<ul>Intro &amp; <em>context</em>.<li>before</li>Between items.<pre>code</pre><li>after</li>Outro.</ul>
+<ol><li>first</li><p>A paragraph.</p><li>last</li></ol>
+<ul>Only prose &amp; <code>code</code>.</ul>
+@note <ul><li>before</li><pre>example</pre><li>after</li></ul>

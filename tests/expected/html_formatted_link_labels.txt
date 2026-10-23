@@ -1,0 +1,5 @@
+`Foo <https://example.com>`__
+
+`Use bold, emphasis, and code <https://example.com>`__
+
+`Foo & Bar <https://example.com>`__
